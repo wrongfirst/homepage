@@ -12,7 +12,7 @@ window.DIRECTORY_DATA = {
       "items": [
         {
           "name": "warmup",
-          "url": "https://wrongfirst.github.io/warmup",
+          "url": "https://wrongfirst.dev/warmup/",
           "languages": [
             "python",
             "typescript",
@@ -23,7 +23,7 @@ window.DIRECTORY_DATA = {
         },
         {
           "name": "dsa",
-          "url": "https://wrongfirst.github.io/dsa",
+          "url": "https://wrongfirst.dev/dsa/",
           "languages": [
             "python",
             "go",
@@ -32,7 +32,7 @@ window.DIRECTORY_DATA = {
         },
         {
           "name": "more-dsa",
-          "url": "https://wrongfirst.github.io/more-dsa",
+          "url": "https://wrongfirst.dev/more-dsa/",
           "languages": [
             "python",
             "go",
@@ -41,7 +41,7 @@ window.DIRECTORY_DATA = {
         },
         {
           "name": "most-dsa",
-          "url": "https://wrongfirst.github.io/most-dsa",
+          "url": "https://wrongfirst.dev/most-dsa/",
           "languages": [
             "python",
             "go",
@@ -55,7 +55,7 @@ window.DIRECTORY_DATA = {
       "items": [
         {
           "name": "fft",
-          "url": "https://wrongfirst.github.io/fft",
+          "url": "https://wrongfirst.dev/fft/",
           "languages": [
             "ocaml"
           ],
