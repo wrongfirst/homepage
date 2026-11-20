@@ -1,0 +1,10 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "wrongfirst",
+  "account_id": "3519a01b37f2fd8a3837212fb89c1073",
+  "workers_dev": false,
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "none"
+  }
+}

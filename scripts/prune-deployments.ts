@@ -1,0 +1,149 @@
+import { execFileSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const API_BASE = 'https://api.cloudflare.com/client/v4';
+const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+export const RETENTION_LIMIT = 10;
+
+interface WranglerConfig {
+  name?: string;
+  account_id?: string;
+}
+
+interface Deployment {
+  id: string;
+  created_on: string;
+}
+
+interface CloudflareAuth {
+  token: string;
+  accountId: string;
+}
+
+interface ResultInfo {
+  page: number;
+  per_page: number;
+  count: number;
+  total_count: number;
+  total_pages: number;
+}
+
+interface CloudflareResponse<T> {
+  success: boolean;
+  errors?: Array<{ code: number; message: string }>;
+  result: T;
+  result_info?: ResultInfo;
+}
+
+// Plain JSON.parse: wrangler.jsonc must stay comment-free.
+function readWranglerConfig(): WranglerConfig {
+  return JSON.parse(fs.readFileSync(path.join(ROOT_DIR, 'wrangler.jsonc'), 'utf8')) as WranglerConfig;
+}
+
+// Resolve credentials exactly as `wrangler deploy` does:
+// - account: `account_id` in wrangler.jsonc, then CLOUDFLARE_ACCOUNT_ID
+// - token: `wrangler auth token` (CLOUDFLARE_API_TOKEN, or the active OAuth login/profile, refreshed if expired)
+function getCloudflareAuth(): CloudflareAuth {
+  const config = readWranglerConfig();
+  const accountId = config.account_id || process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (!accountId) throw new Error('No account_id in wrangler.jsonc and CLOUDFLARE_ACCOUNT_ID is not set');
+
+  const output = execFileSync('npx', ['wrangler', 'auth', 'token', '--json'], {
+    cwd: ROOT_DIR,
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'inherit'],
+  });
+  const { token } = JSON.parse(output) as { token?: string };
+  if (!token) throw new Error('Pruning requires an API token or OAuth login (API key auth is not supported)');
+
+  return { token, accountId };
+}
+
+async function cfFetch<T>(auth: CloudflareAuth, endpoint: string, init: RequestInit = {}): Promise<CloudflareResponse<T>> {
+  const response = await fetch(`${API_BASE}/accounts/${auth.accountId}${endpoint}`, {
+    ...init,
+    headers: { Authorization: `Bearer ${auth.token}` },
+  });
+  const data = (await response.json().catch(() => null)) as CloudflareResponse<T> | null;
+
+  if (!response.ok || !data?.success) {
+    const detail = data?.errors?.map(e => `[${e.code}] ${e.message}`).join(', ') || response.statusText;
+    throw new Error(`Cloudflare API error (${response.status}): ${detail}`);
+  }
+  return data;
+}
+
+async function listDeployments(auth: CloudflareAuth, scriptPath: string): Promise<Deployment[]> {
+  const deployments: Deployment[] = [];
+  let page = 1;
+  let totalPages = 1;
+
+  do {
+    const { result, result_info } = await cfFetch<{ deployments?: Deployment[] }>(
+      auth,
+      `${scriptPath}?page=${page}&per_page=100`
+    );
+    deployments.push(...(result.deployments ?? []));
+    totalPages = result_info?.total_pages ?? 1;
+    page++;
+  } while (page <= totalPages);
+
+  return deployments;
+}
+
+export function getWorkerName(): string {
+  const envName = process.env.WORKER_NAME?.trim();
+  if (envName) return envName;
+
+  const configName = readWranglerConfig().name?.trim();
+  if (configName) return configName;
+
+  throw new Error('No Worker name configured: set "name" in wrangler.jsonc or WORKER_NAME in the environment');
+}
+
+// Deletes deployment records beyond the newest RETENTION_LIMIT. The active (newest) deployment is
+// always retained. Versions are left alone: Cloudflare has no delete endpoint for them and
+// automatically retains only the most recent ones.
+export async function pruneDeployments(workerName = getWorkerName()): Promise<void> {
+  const auth = getCloudflareAuth();
+  const scriptPath = `/workers/scripts/${workerName}/deployments`;
+
+  console.log(`[prune] Checking deployments for Worker '${workerName}' (Account: ${auth.accountId})...`);
+  const deployments = await listDeployments(auth, scriptPath);
+
+  if (deployments.length <= RETENTION_LIMIT) {
+    console.log(`[prune] ${deployments.length} deployment(s) found, within limit of ${RETENTION_LIMIT}. Nothing to prune.`);
+    return;
+  }
+
+  const toDelete = deployments
+    .sort((a, b) => Date.parse(b.created_on) - Date.parse(a.created_on))
+    .slice(RETENTION_LIMIT);
+
+  console.log(
+    `[prune] ${deployments.length} deployment(s) found (limit: ${RETENTION_LIMIT}). Pruning ${toDelete.length} old deployment(s)...`
+  );
+
+  let failed = 0;
+  for (const dep of toDelete) {
+    try {
+      await cfFetch(auth, `${scriptPath}/${dep.id}`, { method: 'DELETE' });
+      console.log(`  ✓ Deleted deployment ${dep.id} (created: ${dep.created_on})`);
+    } catch (err: any) {
+      failed++;
+      console.error(`  ✗ Failed to delete deployment ${dep.id}: ${err.message}`);
+    }
+  }
+
+  if (failed) throw new Error(`${failed} of ${toDelete.length} deployment deletion(s) failed`);
+  console.log(`[prune] Deleted ${toDelete.length} deployment(s); retained the latest ${RETENTION_LIMIT}.`);
+}
+
+if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
+  pruneDeployments().catch(err => {
+    console.error(`[prune] Error: ${err.message}`);
+    process.exit(1);
+  });
+}

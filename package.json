@@ -1,0 +1,15 @@
+{
+  "name": "wrongfirst",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "clean": "rm -rf dist",
+    "build": "node scripts/build.ts",
+    "deploy": "node scripts/deploy.ts",
+    "prune:deployments": "node scripts/prune-deployments.ts"
+  },
+  "devDependencies": {
+    "@types/node": "^26.1.1",
+    "wrangler": "^4.148.0"
+  }
+}
