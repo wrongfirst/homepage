@@ -34,7 +34,7 @@
   /* Shared contract tokens */
   --color-brand: #fe640b;
   --bg-app: #eff1f5;
-  --bg-surface: #e6e9ef;
+  --bg-surface: #e5ebea;
   --fg-primary: #4c4f69;
   --fg-muted: #8c8fa1;
   --border-default: #ccd0da;
@@ -152,11 +152,11 @@ a:focus-visible {
 }
 
 /* ==========================================================================
-   Shared Top Bar (Matches codebook h-14 / 56px header anchor)
+   Shared Top Bar (Matches codebook md:h-12 / 48px header anchor, 44px on < 768px)
    ========================================================================== */
 
 .top-bar {
-  height: 56px;
+  height: 48px;
   background-color: var(--bg-surface);
   border-bottom: 1px solid var(--border-default);
   padding: 0 2rem;
@@ -176,8 +176,8 @@ a:focus-visible {
 }
 
 .top-brand-logo {
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -185,8 +185,8 @@ a:focus-visible {
 }
 
 .top-brand-logo-svg {
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   display: block;
 }
 
@@ -197,7 +197,7 @@ a:focus-visible {
 
 .site-title {
   font-family: var(--font-sans);
-  font-size: 1.125rem;
+  font-size: 1rem;
   font-weight: 700;
   letter-spacing: -0.025em;
   line-height: 1.25;
@@ -500,7 +500,7 @@ a:focus-visible {
 .site-footer {
   margin-top: 4.5rem;
   padding-top: 1.25rem;
-  border-top: 1px solid var(--border-divider);
+  border-top: 1px solid color-mix(in srgb, var(--border-divider) 60%, transparent);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -559,6 +559,12 @@ a:focus-visible {
 /* ==========================================================================
    Mobile Responsive Adjustments
    ========================================================================== */
+
+@media (max-width: 767px) {
+  .top-bar {
+    height: 44px;
+  }
+}
 
 @media (max-width: 639px) {
   .top-bar {
