@@ -5,22 +5,27 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
-const STATIC_EXTENSIONS = new Set(['.html', '.css', '.js']);
+const STATIC_FILES = ['index.html', 'styles.css', 'app.js', 'directory.json'];
 const STATIC_DIRS = ['favicon'];
 
 function main(): void {
   fs.rmSync(DIST_DIR, { recursive: true, force: true });
   fs.mkdirSync(DIST_DIR, { recursive: true });
 
-  const entries = fs.readdirSync(ROOT_DIR, { withFileTypes: true });
   const copied: string[] = [];
 
-  for (const entry of entries) {
-    if (!entry.isFile()) continue;
-    if (!STATIC_EXTENSIONS.has(path.extname(entry.name))) continue;
+  for (const filename of STATIC_FILES) {
+    const src = path.join(ROOT_DIR, filename);
+    if (!fs.existsSync(src)) {
+      throw new Error(`Expected ${filename} in project root, but none was found.`);
+    }
 
-    fs.copyFileSync(path.join(ROOT_DIR, entry.name), path.join(DIST_DIR, entry.name));
-    copied.push(entry.name);
+    if (filename.endsWith('.json')) {
+      JSON.parse(fs.readFileSync(src, 'utf8'));
+    }
+
+    fs.copyFileSync(src, path.join(DIST_DIR, filename));
+    copied.push(filename);
   }
 
   for (const dir of STATIC_DIRS) {
@@ -28,10 +33,6 @@ function main(): void {
     if (!fs.existsSync(src)) continue;
     fs.cpSync(src, path.join(DIST_DIR, dir), { recursive: true });
     copied.push(`${dir}/`);
-  }
-
-  if (!copied.includes('index.html')) {
-    throw new Error('Expected index.html in project root, but none was found.');
   }
 
   console.log(`[build] Staged ${copied.length} asset(s) into dist/: ${copied.sort().join(', ')}`);

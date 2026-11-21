@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "title": "wrongfirst",
+  "subtitle": "a collection of programming exercises you can solve from your browser",
+  "sections": [
+    {
+      "title": "Code",
+      "items": [
+        {
+          "slug": "warmup",
+          "name": "warmup",
+          "url": "/warmup/",
+          "emoji": "🎲",
+          "languages": [
+            "python",
+            "typescript",
+            "go",
+            "ocaml"
+          ],
+          "description": "some syntax and basic concepts you (probably) forgot",
+          "exerciseCount": 36
+        },
+        {
+          "slug": "dsa",
+          "name": "dsa",
+          "url": "/dsa/",
+          "emoji": "🪛",
+          "languages": [
+            "python",
+            "go",
+            "cpp"
+          ],
+          "description": "first level dsa problems",
+          "exerciseCount": 75
+        },
+        {
+          "slug": "more-dsa",
+          "name": "more-dsa",
+          "url": "/more-dsa/",
+          "emoji": "🔨",
+          "languages": [
+            "python",
+            "go"
+          ],
+          "description": "another round of problems covering more patterns",
+          "exerciseCount": 75
+        },
+        {
+          "slug": "most-dsa",
+          "name": "most-dsa",
+          "url": "/most-dsa/",
+          "emoji": "🛠️",
+          "languages": [
+            "python",
+            "go"
+          ],
+          "description": "you already know where this is going",
+          "exerciseCount": 100
+        }
+      ]
+    },
+    {
+      "title": "Projects",
+      "items": [
+        {
+          "slug": "fft",
+          "name": "fft",
+          "url": "/fft/",
+          "emoji": "🐪",
+          "languages": [
+            "ocaml"
+          ],
+          "description": "write your own fftw",
+          "exerciseCount": 6
+        }
+      ]
+    }
+  ]
+}

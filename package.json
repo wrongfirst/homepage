@@ -5,6 +5,8 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "node scripts/build.ts",
+    "dev": "node scripts/dev.ts",
+    "serve": "node scripts/dev.ts --dist",
     "deploy": "node scripts/deploy.ts",
     "prune:deployments": "node scripts/prune-deployments.ts"
   },

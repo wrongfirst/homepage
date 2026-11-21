@@ -5,6 +5,8 @@
 (function () {
   'use strict';
 
+  const USER_SETTINGS_KEY = 'user_settings';
+
   // --- Devicon Mapping for Programming Languages & Tech Stacks ---
   const DEVICONS = {
     typescript: { class: 'devicon-typescript-plain colored', name: 'TypeScript' },
@@ -41,14 +43,87 @@
   // --- DOM Elements ---
   const siteTitleEl = document.getElementById('site-title');
   const siteSubtitleEl = document.getElementById('site-subtitle');
+  const continueContainer = document.getElementById('continue-container');
   const contentContainer = document.getElementById('content-container');
 
-  // --- Escaping Helper ---
+  // --- Helpers ---
   function escapeHtml(str) {
     if (!str) return '';
     const div = document.createElement('div');
     div.textContent = str;
     return div.innerHTML;
+  }
+
+  function isExternalUrl(rawUrl) {
+    if (!rawUrl || rawUrl.startsWith('#')) return false;
+    try {
+      const parsed = new URL(rawUrl, window.location.href);
+      return parsed.origin !== window.location.origin;
+    } catch {
+      return false;
+    }
+  }
+
+  function formatSlugLabel(slug) {
+    if (!slug) return '';
+    return String(slug)
+      .replace(/[-_]+/g, ' ')
+      .replace(/\b\w/g, (ch) => ch.toUpperCase());
+  }
+
+  function readJsonStorage(key) {
+    try {
+      const raw = window.localStorage.getItem(key);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === 'object' ? (parsed.state ?? parsed) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function readLastVisited() {
+    const settings = readJsonStorage(USER_SETTINGS_KEY);
+    const lv = settings && typeof settings.lastVisited === 'object' ? settings.lastVisited : null;
+    if (!lv || !lv.siteSlug) return null;
+    return {
+      siteSlug: String(lv.siteSlug),
+      siteTitle: lv.siteTitle ? String(lv.siteTitle) : String(lv.siteSlug),
+      lessonSlug: lv.lessonSlug ? String(lv.lessonSlug) : '',
+      lessonTitle: lv.lessonTitle ? String(lv.lessonTitle) : '',
+      updatedAt: typeof lv.updatedAt === 'number' ? lv.updatedAt : 0
+    };
+  }
+
+  function readBookProgress(item) {
+    if (!item || !item.slug) return null;
+    const state = readJsonStorage(`${item.slug}_storage`);
+    if (!state) return null;
+
+    const completed = Array.isArray(state.completedSlugs) ? state.completedSlugs.length : 0;
+    const totalFromManifest = typeof item.exerciseCount === 'number' && item.exerciseCount > 0 ? item.exerciseCount : null;
+    const totalFromStorage = typeof state.exerciseCount === 'number' && state.exerciseCount > 0 ? state.exerciseCount : null;
+    const total = totalFromManifest ?? totalFromStorage;
+
+    if (completed <= 0) return null;
+
+    const isComplete = total !== null && completed >= total;
+    const pct = total !== null ? Math.min(100, Math.round((completed / total) * 100)) : null;
+
+    return { completed, total, isComplete, pct };
+  }
+
+  function getVisibleItemsMap() {
+    const map = new Map();
+    if (!directoryData || !Array.isArray(directoryData.sections)) return map;
+    for (const section of directoryData.sections) {
+      if (section.hidden || !Array.isArray(section.items)) continue;
+      for (const item of section.items) {
+        if (item.hidden || !item.slug) continue;
+        map.set(item.slug, item);
+      }
+    }
+    return map;
   }
 
   // --- Render Language Icons Helper ---
@@ -61,12 +136,10 @@
       const raw = String(langKey).trim();
       const key = raw.toLowerCase();
 
-      // Direct Devicon class support (e.g. "devicon-rust-plain colored")
       if (raw.startsWith('devicon-')) {
         return `<span class="lang-icon" title="${escapeHtml(raw)}" aria-label="${escapeHtml(raw)}"><i class="${escapeHtml(raw)}"></i></span>`;
       }
 
-      // Mapped Devicon definition with native .colored styling
       const iconDef = DEVICONS[key];
       if (iconDef) {
         return `<span class="lang-icon" title="${escapeHtml(iconDef.name)}" aria-label="${escapeHtml(iconDef.name)}"><i class="${iconDef.class}"></i></span>`;
@@ -80,17 +153,15 @@
 
   // --- Fetch / Load Data ---
   async function loadDirectory() {
-    // If loaded via links.js (works seamlessly on file:/// and http://)
     if (window.DIRECTORY_DATA) {
       applyData(window.DIRECTORY_DATA);
       return;
     }
 
-    // Fallback to fetch links.json (if running on a server without links.js tag)
     try {
-      const res = await fetch('links.json', { cache: 'no-cache' });
+      const res = await fetch('./directory.json', { cache: 'no-cache' });
       if (!res.ok) {
-        throw new Error(`Failed to load links.json (HTTP ${res.status})`);
+        throw new Error(`Failed to load directory.json (HTTP ${res.status})`);
       }
       const data = await res.json();
       applyData(data);
@@ -114,6 +185,10 @@
 
   // --- Render Functions ---
   function renderError(message) {
+    if (continueContainer) {
+      continueContainer.hidden = true;
+      continueContainer.innerHTML = '';
+    }
     contentContainer.innerHTML = `
       <div class="error-state">
         <p><strong>Unable to load directory</strong></p>
@@ -122,16 +197,76 @@
     `;
   }
 
-  function render() {
-    if (!directoryData || !Array.isArray(directoryData.sections)) {
-      renderError('Invalid data format in links.json.');
+  const SHOW_CONTINUE_BANNER = false;
+
+  function renderContinueBanner() {
+    if (!continueContainer) return;
+
+    if (!SHOW_CONTINUE_BANNER) {
+      continueContainer.hidden = true;
+      continueContainer.innerHTML = '';
       return;
     }
 
-    const renderedSections = directoryData.sections.map((section) => {
-      const items = Array.isArray(section.items) ? section.items : [];
-      return renderSection(section, items);
-    });
+    const lastVisited = readLastVisited();
+    if (!lastVisited) {
+      continueContainer.hidden = true;
+      continueContainer.innerHTML = '';
+      return;
+    }
+
+    const visibleItems = getVisibleItemsMap();
+    const matchedItem = visibleItems.get(lastVisited.siteSlug);
+    if (!matchedItem) {
+      continueContainer.hidden = true;
+      continueContainer.innerHTML = '';
+      return;
+    }
+
+    const baseUrl = matchedItem.url || `/${encodeURIComponent(matchedItem.slug)}/`;
+    const href = lastVisited.lessonSlug
+      ? `${baseUrl}#${encodeURIComponent(lastVisited.lessonSlug)}`
+      : baseUrl;
+    const emojiHtml = matchedItem.emoji
+      ? `<span class="item-emoji" aria-hidden="true">${escapeHtml(matchedItem.emoji)}</span>`
+      : '';
+    const bookName = escapeHtml(matchedItem.name || lastVisited.siteTitle);
+    const lessonLabel = escapeHtml(lastVisited.lessonTitle || formatSlugLabel(lastVisited.lessonSlug));
+
+    continueContainer.innerHTML = `
+      <a href="${escapeHtml(href)}" class="continue-card">
+        <div class="continue-main">
+          <span class="continue-label">Continue</span>
+          <span class="continue-target">
+            ${emojiHtml}
+            <span class="continue-book">${bookName}</span>
+            ${lessonLabel ? `<span class="continue-sep" aria-hidden="true">·</span><span class="continue-lesson">${lessonLabel}</span>` : ''}
+          </span>
+        </div>
+        <span class="continue-arrow" aria-hidden="true">→</span>
+      </a>
+    `;
+    continueContainer.hidden = false;
+  }
+
+  function render() {
+    if (!directoryData || !Array.isArray(directoryData.sections)) {
+      renderError('Invalid data format in directory.json.');
+      return;
+    }
+
+    renderContinueBanner();
+
+    const renderedSections = directoryData.sections
+      .filter((section) => !section.hidden)
+      .map((section) => {
+        const items = Array.isArray(section.items)
+          ? section.items.filter((item) => !item.hidden)
+          : [];
+        if (items.length === 0) return '';
+        return renderSection(section, items);
+      })
+      .filter(Boolean);
 
     if (renderedSections.length === 0) {
       contentContainer.innerHTML = `
@@ -151,22 +286,36 @@
       const name = escapeHtml(item.name || 'Unnamed');
       const url = escapeHtml(item.url || '#');
       const desc = escapeHtml(item.description || '');
-      const isExternal = item.url && (item.url.startsWith('http://') || item.url.startsWith('https://'));
+      const isExternal = isExternalUrl(item.url);
       const targetAttr = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
       const arrowIcon = `<span class="link-arrow" aria-hidden="true">${isExternal ? '↗' : '→'}</span>`;
       const languagesHtml = renderLanguages(item.languages);
 
+      const progress = readBookProgress(item);
+      const progressCountHtml = progress
+        ? `<span class="item-progress-count${progress.isComplete ? ' is-complete' : ''}" title="${progress.total !== null ? `${progress.completed} of ${progress.total} completed` : `${progress.completed} completed`}">${progress.total !== null ? `${progress.completed}/${progress.total}` : `${progress.completed}`}${progress.isComplete ? ' ✓' : ''}</span>`
+        : '';
+      const progressBarHtml = progress && progress.pct !== null
+        ? `<div class="item-progress-track" aria-hidden="true"><div class="item-progress-fill${progress.isComplete ? ' is-complete' : ''}" style="width: ${progress.pct}%"></div></div>`
+        : '';
+
       return `
         <li class="directory-item">
-          <div class="item-content">
-            <h3 class="item-title">
-              <a href="${url}" class="item-link"${targetAttr}>
-                ${name} ${arrowIcon}
-              </a>
-            </h3>
-            <p class="item-desc">${desc}</p>
+          <div class="item-row">
+            <div class="item-content">
+              <h3 class="item-title">
+                <a href="${url}" class="item-link"${targetAttr}>
+                  <span>${name}</span> ${arrowIcon}
+                </a>
+              </h3>
+              <p class="item-desc">${desc}</p>
+            </div>
+            <div class="item-meta">
+              ${progressCountHtml}
+              ${languagesHtml}
+            </div>
           </div>
-          ${languagesHtml}
+          ${progressBarHtml}
         </li>
       `;
     }).join('');
@@ -182,6 +331,19 @@
       </section>
     `;
   }
+
+  // Refresh progress & Continue strip when returning via bfcache or across tabs
+  window.addEventListener('pageshow', (e) => {
+    if (e.persisted && directoryData) {
+      render();
+    }
+  });
+
+  window.addEventListener('storage', () => {
+    if (directoryData) {
+      render();
+    }
+  });
 
   // --- Init ---
   loadDirectory();
