@@ -5,7 +5,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
-const STATIC_FILES = ['index.html', 'styles.css', 'app.js', 'directory.json'];
+const STATIC_FILES = ['index.html', 'tokens.css', 'styles.css', 'app.js', 'directory.json'];
 const STATIC_DIRS = ['favicon'];
 
 function main(): void {
