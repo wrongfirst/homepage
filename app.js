@@ -82,16 +82,24 @@
     }
   }
 
-  function readLastVisited() {
+  const RING_RADIUS = 9;
+  const RING_CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
+
+  function readContinueTarget() {
     const settings = readJsonStorage(USER_SETTINGS_KEY);
-    const lv = settings && typeof settings.lastVisited === 'object' ? settings.lastVisited : null;
-    if (!lv || !lv.siteSlug) return null;
+    const lc = settings && typeof settings.lastCompleted === 'object' ? settings.lastCompleted : null;
+    if (!lc || !lc.siteSlug) return null;
+
+    const nextSlug = lc.nextLessonSlug ? String(lc.nextLessonSlug).trim() : '';
+    const nextTitle = lc.nextLessonTitle ? String(lc.nextLessonTitle).trim() : '';
+    if (!nextSlug && !nextTitle) return null;
+
     return {
-      siteSlug: String(lv.siteSlug),
-      siteTitle: lv.siteTitle ? String(lv.siteTitle) : String(lv.siteSlug),
-      lessonSlug: lv.lessonSlug ? String(lv.lessonSlug) : '',
-      lessonTitle: lv.lessonTitle ? String(lv.lessonTitle) : '',
-      updatedAt: typeof lv.updatedAt === 'number' ? lv.updatedAt : 0
+      siteSlug: String(lc.siteSlug),
+      siteTitle: lc.siteTitle ? String(lc.siteTitle) : String(lc.siteSlug),
+      lessonSlug: nextSlug,
+      lessonTitle: nextTitle,
+      completedAt: typeof lc.completedAt === 'number' ? lc.completedAt : 0
     };
   }
 
@@ -137,18 +145,83 @@
       const key = raw.toLowerCase();
 
       if (raw.startsWith('devicon-')) {
-        return `<span class="lang-icon" title="${escapeHtml(raw)}" aria-label="${escapeHtml(raw)}"><i class="${escapeHtml(raw)}"></i></span>`;
+        const label = escapeHtml(raw);
+        return `<span class="lang-icon" data-tooltip="${label}" aria-label="${label}"><i class="${label}" aria-hidden="true"></i></span>`;
       }
 
       const iconDef = DEVICONS[key];
       if (iconDef) {
-        return `<span class="lang-icon" title="${escapeHtml(iconDef.name)}" aria-label="${escapeHtml(iconDef.name)}"><i class="${iconDef.class}"></i></span>`;
+        const label = escapeHtml(iconDef.name);
+        return `<span class="lang-icon" data-tooltip="${label}" aria-label="${label}"><i class="${iconDef.class}" aria-hidden="true"></i></span>`;
       }
 
       return `<span class="lang-badge-text">${escapeHtml(raw)}</span>`;
     }).join('');
 
-    return `<div class="item-languages" aria-label="Languages">${iconsHtml}</div>`;
+    return `<span class="item-languages" aria-label="Languages"><span class="item-desc-sep" aria-hidden="true">·</span>${iconsHtml}</span>`;
+  }
+
+  // --- Render Circular Progress Indicator ---
+  function renderProgressRing(item, progress) {
+    if (isExternalUrl(item.url) && !progress) {
+      return '';
+    }
+
+    const totalKnown = typeof item.exerciseCount === 'number' && item.exerciseCount > 0
+      ? item.exerciseCount
+      : null;
+
+    if (!progress) {
+      const tip = totalKnown !== null ? `0/${totalKnown}` : 'Not started';
+      return `
+        <div class="progress-ring-wrap is-empty" role="img" aria-label="${escapeHtml(tip)}">
+          <svg class="progress-ring" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="progress-ring-track" cx="12" cy="12" r="${RING_RADIUS}" />
+          </svg>
+          <span class="progress-ring-tip">${escapeHtml(tip)}</span>
+        </div>
+      `;
+    }
+
+    if (progress.pct === null) {
+      const tip = `${progress.completed} done`;
+      return `
+        <div class="progress-ring-wrap is-indeterminate" role="img" aria-label="${escapeHtml(tip)}">
+          <svg class="progress-ring" viewBox="0 0 24 24" aria-hidden="true">
+            <circle class="progress-ring-track" cx="12" cy="12" r="${RING_RADIUS}" />
+            <circle class="progress-ring-fill is-indeterminate" cx="12" cy="12" r="${RING_RADIUS}" />
+          </svg>
+          <span class="progress-ring-tip">${escapeHtml(tip)}</span>
+        </div>
+      `;
+    }
+
+    const visualPct = progress.isComplete ? 100 : Math.max(4, progress.pct);
+    const dashOffset = (RING_CIRCUMFERENCE * (1 - visualPct / 100)).toFixed(2);
+    const tip = progress.isComplete
+      ? `${progress.completed}/${progress.total} ✓`
+      : `${progress.completed}/${progress.total} (${progress.pct}%)`;
+    const checkHtml = progress.isComplete
+      ? '<path class="progress-ring-check" d="M8.5 12.2l2.2 2.2 4.8-4.8" />'
+      : '';
+
+    return `
+      <div class="progress-ring-wrap${progress.isComplete ? ' is-complete' : ''}" role="img" aria-label="${escapeHtml(tip)}">
+        <svg class="progress-ring" viewBox="0 0 24 24" aria-hidden="true">
+          <circle class="progress-ring-track" cx="12" cy="12" r="${RING_RADIUS}" />
+          <circle
+            class="progress-ring-fill"
+            cx="12"
+            cy="12"
+            r="${RING_RADIUS}"
+            stroke-dasharray="${RING_CIRCUMFERENCE.toFixed(2)}"
+            stroke-dashoffset="${dashOffset}"
+          />
+          ${checkHtml}
+        </svg>
+        <span class="progress-ring-tip">${escapeHtml(tip)}</span>
+      </div>
+    `;
   }
 
   // --- Fetch / Load Data ---
@@ -197,26 +270,18 @@
     `;
   }
 
-  const SHOW_CONTINUE_BANNER = false;
-
   function renderContinueBanner() {
     if (!continueContainer) return;
 
-    if (!SHOW_CONTINUE_BANNER) {
-      continueContainer.hidden = true;
-      continueContainer.innerHTML = '';
-      return;
-    }
-
-    const lastVisited = readLastVisited();
-    if (!lastVisited) {
+    const nextUp = readContinueTarget();
+    if (!nextUp) {
       continueContainer.hidden = true;
       continueContainer.innerHTML = '';
       return;
     }
 
     const visibleItems = getVisibleItemsMap();
-    const matchedItem = visibleItems.get(lastVisited.siteSlug);
+    const matchedItem = visibleItems.get(nextUp.siteSlug);
     if (!matchedItem) {
       continueContainer.hidden = true;
       continueContainer.innerHTML = '';
@@ -224,14 +289,14 @@
     }
 
     const baseUrl = matchedItem.url || `/${encodeURIComponent(matchedItem.slug)}/`;
-    const href = lastVisited.lessonSlug
-      ? `${baseUrl}#${encodeURIComponent(lastVisited.lessonSlug)}`
+    const href = nextUp.lessonSlug
+      ? `${baseUrl}#${encodeURIComponent(nextUp.lessonSlug)}`
       : baseUrl;
     const emojiHtml = matchedItem.emoji
       ? `<span class="item-emoji" aria-hidden="true">${escapeHtml(matchedItem.emoji)}</span>`
       : '';
-    const bookName = escapeHtml(matchedItem.name || lastVisited.siteTitle);
-    const lessonLabel = escapeHtml(lastVisited.lessonTitle || formatSlugLabel(lastVisited.lessonSlug));
+    const bookName = escapeHtml(matchedItem.name || nextUp.siteTitle);
+    const lessonLabel = escapeHtml(nextUp.lessonTitle || formatSlugLabel(nextUp.lessonSlug));
 
     continueContainer.innerHTML = `
       <a href="${escapeHtml(href)}" class="continue-card">
@@ -292,12 +357,7 @@
       const languagesHtml = renderLanguages(item.languages);
 
       const progress = readBookProgress(item);
-      const progressCountHtml = progress
-        ? `<span class="item-progress-count${progress.isComplete ? ' is-complete' : ''}" title="${progress.total !== null ? `${progress.completed} of ${progress.total} completed` : `${progress.completed} completed`}">${progress.total !== null ? `${progress.completed}/${progress.total}` : `${progress.completed}`}${progress.isComplete ? ' ✓' : ''}</span>`
-        : '';
-      const progressBarHtml = progress && progress.pct !== null
-        ? `<div class="item-progress-track" aria-hidden="true"><div class="item-progress-fill${progress.isComplete ? ' is-complete' : ''}" style="width: ${progress.pct}%"></div></div>`
-        : '';
+      const progressRingHtml = renderProgressRing(item, progress);
 
       return `
         <li class="directory-item">
@@ -308,14 +368,10 @@
                   <span>${name}</span> ${arrowIcon}
                 </a>
               </h3>
-              <p class="item-desc">${desc}</p>
+              <p class="item-desc">${desc}${languagesHtml}</p>
             </div>
-            <div class="item-meta">
-              ${progressCountHtml}
-              ${languagesHtml}
-            </div>
+            ${progressRingHtml ? `<div class="item-meta">${progressRingHtml}</div>` : ''}
           </div>
-          ${progressBarHtml}
         </li>
       `;
     }).join('');

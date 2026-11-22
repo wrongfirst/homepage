@@ -341,13 +341,12 @@ a:focus-visible {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
 }
 
 .item-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 1.5rem;
 }
 
@@ -403,57 +402,124 @@ a:focus-visible {
 .item-meta {
   display: inline-flex;
   align-items: center;
-  gap: 0.85rem;
+  justify-content: flex-end;
   flex-shrink: 0;
-  padding-top: 0.15rem;
 }
 
-.item-progress-count {
+.progress-ring-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  cursor: default;
+}
+
+.progress-ring {
+  width: 24px;
+  height: 24px;
+  display: block;
+  overflow: visible;
+}
+
+.progress-ring-track {
+  fill: none;
+  stroke: color-mix(in srgb, var(--fg-muted) 26%, transparent);
+  stroke-width: 2.25;
+  transition: stroke 0.2s ease;
+}
+
+.progress-ring-wrap.is-empty .progress-ring-track {
+  stroke: color-mix(in srgb, var(--fg-muted) 20%, transparent);
+}
+
+.directory-item:hover .progress-ring-wrap.is-empty .progress-ring-track {
+  stroke: color-mix(in srgb, var(--fg-muted) 34%, transparent);
+}
+
+.progress-ring-fill {
+  fill: none;
+  stroke: var(--ctp-green);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  transform: rotate(-90deg);
+  transform-origin: 12px 12px;
+  transition: stroke-dashoffset 0.25s ease, stroke 0.2s ease;
+}
+
+.progress-ring-fill.is-indeterminate {
+  stroke-dasharray: 4 3.5;
+  stroke-dashoffset: 0;
+  opacity: 0.85;
+}
+
+.progress-ring-check {
+  fill: none;
+  stroke: var(--ctp-green);
+  stroke-width: 2.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.progress-ring-wrap.is-complete .progress-ring-track {
+  fill: color-mix(in srgb, var(--ctp-green) 10%, transparent);
+  stroke: color-mix(in srgb, var(--ctp-green) 25%, transparent);
+}
+
+.progress-ring-tip {
+  position: absolute;
+  right: calc(100% + 8px);
+  top: 50%;
+  transform: translateY(-50%) translateX(3px);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--fg-primary);
   font-family: var(--font-mono);
-  font-size: 0.725rem;
-  font-weight: 500;
-  color: var(--text-dim);
+  font-size: 0.6875rem;
   font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  z-index: 10;
 }
 
-.item-progress-count.is-complete {
-  color: var(--ctp-green);
-}
-
-.item-progress-track {
-  width: 100%;
-  height: 2px;
-  background-color: var(--border-subtle);
-  border-radius: 999px;
-  overflow: hidden;
-}
-
-.item-progress-fill {
-  height: 100%;
-  background-color: var(--color-brand);
-  border-radius: 999px;
-  transition: width 0.25s ease;
-}
-
-.item-progress-fill.is-complete {
-  background-color: var(--ctp-green);
+.progress-ring-wrap:hover .progress-ring-tip {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
 }
 
 .item-languages {
   display: inline-flex;
   align-items: center;
-  gap: 0.55rem;
-  flex-shrink: 0;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-left: 0.45rem;
+  vertical-align: -0.1em;
+}
+
+.item-desc-sep {
+  color: var(--fg-muted);
+  opacity: 0.55;
+  margin-right: 0.1rem;
+  user-select: none;
 }
 
 .lang-icon {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1;
   transition: transform 0.15s ease, opacity 0.15s ease;
   opacity: 0.85;
+  cursor: default;
 }
 
 .directory-item:hover .lang-icon {
@@ -462,6 +528,34 @@ a:focus-visible {
 
 .lang-icon:hover {
   transform: translateY(-1px) scale(1.1);
+}
+
+.lang-icon[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 7px);
+  transform: translateX(-50%) translateY(3px);
+  padding: 2px 7px;
+  border-radius: 5px;
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-default);
+  color: var(--fg-primary);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
+  z-index: 15;
+}
+
+.lang-icon[data-tooltip]:hover::after {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }
 
 .lang-badge-text {
