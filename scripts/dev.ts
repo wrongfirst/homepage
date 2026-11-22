@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
 
-const ALLOWED_ROOT_FILES = new Set(['index.html', 'styles.css', 'app.js', 'directory.json']);
+const ALLOWED_ROOT_FILES = new Set(['index.html', 'styles.css', 'tokens.css', 'app.js', 'directory.json']);
 const ALLOWED_DIRS = new Set(['favicon']);
 
 const MIME_TYPES: Record<string, string> = {
