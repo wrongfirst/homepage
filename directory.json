@@ -4,7 +4,23 @@
   "subtitle": "a collection of programming exercises you can solve from your browser",
   "sections": [
     {
-      "title": "Code",
+      "title": "Build",
+      "items": [
+        {
+          "slug": "fft",
+          "name": "fft",
+          "url": "/fft/",
+          "emoji": "🐪",
+          "languages": [
+            "ocaml"
+          ],
+          "description": "write your own fftw",
+          "exerciseCount": 6
+        }
+      ]
+    },
+    {
+      "title": "Practice",
       "items": [
         {
           "slug": "warmup",
@@ -56,22 +72,6 @@
           ],
           "description": "you already know where this is going",
           "exerciseCount": 100
-        }
-      ]
-    },
-    {
-      "title": "Projects",
-      "items": [
-        {
-          "slug": "fft",
-          "name": "fft",
-          "url": "/fft/",
-          "emoji": "🐪",
-          "languages": [
-            "ocaml"
-          ],
-          "description": "write your own fftw",
-          "exerciseCount": 6
         }
       ]
     }
