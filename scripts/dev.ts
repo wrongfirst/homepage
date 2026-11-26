@@ -4,6 +4,7 @@ import http from 'node:http';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectDirectoryData, readDirectoryJson } from './inline-directory.ts';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
@@ -148,6 +149,32 @@ function handleRequest(req: http.IncomingMessage, res: http.ServerResponse): voi
   }
 
   const ext = path.extname(filePath).toLowerCase();
+
+  if (!serveDist && filePath === path.join(ROOT_DIR, 'index.html')) {
+    let html = fs.readFileSync(filePath, 'utf8');
+    try {
+      const directoryData = readDirectoryJson(path.join(ROOT_DIR, 'directory.json'));
+      html = injectDirectoryData(html, directoryData);
+    } catch (err: any) {
+      console.warn(`[dev] Failed to inline directory.json into index.html: ${err.message}`);
+    }
+
+    const body = Buffer.from(html, 'utf8');
+    res.writeHead(200, {
+      'Content-Type': MIME_TYPES['.html'],
+      'Cache-Control': 'no-cache',
+      'Content-Length': body.length,
+    });
+
+    if (req.method === 'HEAD') {
+      res.end();
+      return;
+    }
+
+    res.end(body);
+    return;
+  }
+
   res.writeHead(200, {
     'Content-Type': MIME_TYPES[ext] || 'application/octet-stream',
     'Cache-Control': 'no-cache',

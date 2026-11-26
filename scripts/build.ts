@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { injectDirectoryData, readDirectoryJson } from './inline-directory.ts';
 
 const ROOT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const DIST_DIR = path.join(ROOT_DIR, 'dist');
@@ -12,6 +13,12 @@ function main(): void {
   fs.rmSync(DIST_DIR, { recursive: true, force: true });
   fs.mkdirSync(DIST_DIR, { recursive: true });
 
+  const directoryJsonPath = path.join(ROOT_DIR, 'directory.json');
+  if (!fs.existsSync(directoryJsonPath)) {
+    throw new Error('Expected directory.json in project root, but none was found.');
+  }
+  const directoryData = readDirectoryJson(directoryJsonPath);
+
   const copied: string[] = [];
 
   for (const filename of STATIC_FILES) {
@@ -20,11 +27,16 @@ function main(): void {
       throw new Error(`Expected ${filename} in project root, but none was found.`);
     }
 
-    if (filename.endsWith('.json')) {
-      JSON.parse(fs.readFileSync(src, 'utf8'));
+    const dest = path.join(DIST_DIR, filename);
+    if (filename === 'index.html') {
+      const html = fs.readFileSync(src, 'utf8');
+      fs.writeFileSync(dest, injectDirectoryData(html, directoryData), 'utf8');
+    } else {
+      if (filename.endsWith('.json') && filename !== 'directory.json') {
+        JSON.parse(fs.readFileSync(src, 'utf8'));
+      }
+      fs.copyFileSync(src, dest);
     }
-
-    fs.copyFileSync(src, path.join(DIST_DIR, filename));
     copied.push(filename);
   }
 

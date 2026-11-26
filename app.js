@@ -232,7 +232,7 @@
     }
 
     try {
-      const res = await fetch('./directory.json', { cache: 'no-cache' });
+      const res = await fetch('./directory.json');
       if (!res.ok) {
         throw new Error(`Failed to load directory.json (HTTP ${res.status})`);
       }
